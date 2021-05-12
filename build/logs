@@ -1,0 +1,6 @@
+[ 20%] Built target gtest
+[ 86%] Built target bolt
+Scanning dependencies of target bolt_test
+[ 93%] Building CXX object test/CMakeFiles/bolt_test.dir/Bolt/bolt_test.cc.o
+[100%] Linking CXX executable bolt_test
+[100%] Built target bolt_test

@@ -1,0 +1,11 @@
+include_directories(${CMAKE_SOURCE_DIR})
+
+set(Bolt_btree 
+    main.cc
+    db.cc
+    )
+
+set(COMMLIBS pthread dl)
+add_executable(Bolt_btree ${Bolt_btree})
+
+target_link_libraries(Bolt_btree ${COMMLIBS})

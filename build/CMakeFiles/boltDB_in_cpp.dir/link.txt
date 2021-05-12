@@ -1,0 +1,2 @@
+/opt/rh/devtoolset-8/root/usr/bin/ar qc libboltDB_in_cpp.a  CMakeFiles/boltDB_in_cpp.dir/src/Bolt/bucket.cc.o CMakeFiles/boltDB_in_cpp.dir/src/Bolt/db.cc.o CMakeFiles/boltDB_in_cpp.dir/src/Bolt/file_util.cc.o CMakeFiles/boltDB_in_cpp.dir/src/Bolt/freeList.cc.o CMakeFiles/boltDB_in_cpp.dir/src/Bolt/main.cc.o CMakeFiles/boltDB_in_cpp.dir/src/Bolt/meta.cc.o CMakeFiles/boltDB_in_cpp.dir/src/Bolt/tx.cc.o CMakeFiles/boltDB_in_cpp.dir/src/Bolt/type.cc.o
+/opt/rh/devtoolset-8/root/usr/bin/ranlib libboltDB_in_cpp.a

@@ -1,0 +1,2 @@
+/opt/rh/devtoolset-8/root/usr/bin/ar qc libgtest.a  CMakeFiles/gtest.dir/__/third_party/gmock/gmock-gtest-all.cc.o CMakeFiles/gtest.dir/__/third_party/gmock/gmock_main.cc.o
+/opt/rh/devtoolset-8/root/usr/bin/ranlib libgtest.a

@@ -1,0 +1,8 @@
+/roland.qi/cbtree/build/CMakeFiles/rebuild_cache.dir
+/roland.qi/cbtree/build/CMakeFiles/edit_cache.dir
+/roland.qi/cbtree/build/CMakeFiles/bolt.dir
+/roland.qi/cbtree/build/test/CMakeFiles/rebuild_cache.dir
+/roland.qi/cbtree/build/test/CMakeFiles/gtest.dir
+/roland.qi/cbtree/build/test/CMakeFiles/check.dir
+/roland.qi/cbtree/build/test/CMakeFiles/bolt_test.dir
+/roland.qi/cbtree/build/test/CMakeFiles/edit_cache.dir
