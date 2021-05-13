@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/rolandqi/cbtree.svg?branch=main)](https://travis-ci.com/rolandqi/cbtree)
+
 # cbtree
 
 implement several b-tree structures in c++.
