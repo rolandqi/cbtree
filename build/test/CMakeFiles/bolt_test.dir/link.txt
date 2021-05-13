@@ -1,1 +1,0 @@
-/opt/rh/devtoolset-8/root/usr/bin/c++   -Wall -O3 -g -fsanitize=address -static-libasan -fno-omit-frame-pointer  -rdynamic CMakeFiles/bolt_test.dir/Bolt/bolt_test.cc.o  -o bolt_test ../libbolt.a libgtest.a -lpthread 
