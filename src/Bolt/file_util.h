@@ -15,6 +15,7 @@
 
 long GetAvailableSpace(const char *path);
 long GetAvailableSpace(int fd);
+long GetFileSize(int fd);
 
 // read small file < 64KB
 class ReadSmallFile {

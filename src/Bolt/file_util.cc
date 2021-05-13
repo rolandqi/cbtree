@@ -42,6 +42,16 @@ long GetAvailableSpace(int fd) {
   return stat.f_bsize * stat.f_bavail;
 }
 
+long GetFileSize(int fd) {
+  struct stat stat1;
+  auto ret = fstat(fd, &stat1);
+  if (ret == -1) {
+    perror("stat");
+    return 0;
+  }
+  return stat1.st_size;
+}
+
 AppendFile::AppendFile(StringArg filename)
     : fp_(::fopen(filename.c_str(), "ae")), // 'e' for O_CLOEXEC
       writtenBytes_(0) {

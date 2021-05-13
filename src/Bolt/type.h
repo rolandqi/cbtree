@@ -7,6 +7,7 @@
 #include <vector>
 #include <functional>
 #include <assert.h>
+#include <glog/logging.h>
 
 using namespace std;
 

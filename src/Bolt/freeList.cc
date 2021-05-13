@@ -5,11 +5,12 @@
 
 	template<typename T>
 	void print(const T &a){
+    std::stringstream ss;
 		typename T::const_iterator iter = a.begin();
 		for(; iter != a.end(); iter++){
-			cout<<*iter<<", ";
+			ss <<*iter<<", ";
 		}
-		cout<<endl;
+		LOG(INFO) << ss.str();
 	}
 
 // |page haeder|pgid|pgid|...|
@@ -112,11 +113,11 @@ void freeList::mergeids_(vector<pgid> *dest, const vector<pgid> &src) {
   if (it2 != ids_.end()) {
     dest->insert(dest->end(), it2, ids_.end());
   }
-  cout << "pending: ";
+  LOG(INFO) << "pending: ";
   print(src);
-  cout << "ids_: ";
+  LOG(INFO) << "ids_: ";
   print(ids_);
-  cout << "dest: ";
+  LOG(INFO) << "dest: ";
   print(*dest);
 }
 
@@ -140,10 +141,10 @@ pgid freeList::allocate(uint32_t numPages) {
     }
 
     if (id - init + 1 == numPages ) {
-      cout << "before erase: ";
+      LOG(INFO) << "before erase: ";
       print(ids_);
       ids_.erase(ids_.begin() + i - numPages + 1, ids_.begin() + i + 1);
-      cout << "after erase: ";
+      LOG(INFO) << "after erase: ";
       print(ids_);
 
       for (size_t j = 0; j < numPages; j++) {
@@ -206,13 +207,13 @@ void freeList::rollback(txid txid) {
 
 void freeList::free(txid txid, page *p) {
   if (p->id <= 1) {
-    cout << "ERROR! cannot free page " << p->id << endl;
+    LOG(INFO) << "ERROR! cannot free page " << p->id;
   }
   auto &ids = pending_[txid];
   for (auto id = p->id; id <= p->id + p->overflow; ++id) {
     // 当前页已经被free了。
     if (cache_[id]) {
-      cout << "ERROR! page " << p->id << " already been freed!" << endl;
+      LOG(INFO) << "ERROR! page " << p->id << " already been freed!";
       assert(false);
     }
     ids.push_back(id);

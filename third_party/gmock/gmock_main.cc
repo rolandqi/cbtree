@@ -32,6 +32,7 @@
 #include <iostream>
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <glog/logging.h>
 
 // MS C++ compiler/linker has a bug on Windows (not on Windows CE), which
 // causes a link error when _tmain is defined in a static library and UNICODE
@@ -45,7 +46,24 @@ GTEST_API_ int _tmain(int argc, TCHAR** argv) {
 #else
 GTEST_API_ int main(int argc, char** argv) {
 #endif  // GTEST_OS_WINDOWS_MOBILE
-  std::cout << "Running main() from gmock_main.cc\n";
+  google::InitGoogleLogging(argv[0]);
+  FLAGS_logtostderr = true;  //设置日志消息是否转到标准输出而不是日志文件
+
+  FLAGS_alsologtostderr = true;  //设置日志消息除了日志文件之外是否去标准输出
+
+  FLAGS_colorlogtostderr = true;  //设置记录到标准输出的颜色消息（如果终端支持）
+
+  FLAGS_log_prefix = true;  //设置日志前缀是否应该添加到每行输出
+
+  FLAGS_logbufsecs = 0;  //设置可以缓冲日志的最大秒数，0指实时输出
+
+  FLAGS_max_log_size = 50;  //设置最大日志文件大小（以MB为单位）
+
+  FLAGS_stop_logging_if_full_disk = true;  //设置是否在磁盘已满时避免日志记录到磁盘
+  FLAGS_log_dir = "./logs/";
+  // google::COUNTER 统计某行代码被执行了多少次
+
+  LOG(INFO) << "Running main() from gmock_main.cc";
   // Since Google Mock depends on Google Test, InitGoogleMock() is
   // also responsible for initializing Google Test.  Therefore there's
   // no need for calling testing::InitGoogleTest() separately.

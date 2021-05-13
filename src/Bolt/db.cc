@@ -35,7 +35,7 @@ bool meta::validate() {
 }
 
 DB::DB(const string &path)
-    : path_(path), lock_file_(path_ + "_lock"), freeList_(new freeList()), bucketPool_(MAXOBJPOOLSIZE),
+    : StrictMode_(false), NoSync_(false), NoGrowSync_(false), path_(path), lock_file_(path_ + "_lock"), dataref_(nullptr), data_(nullptr), freeList_(new freeList()), bucketPool_(MAXOBJPOOLSIZE),
       cursorPool_(MAXOBJPOOLSIZE), nodePool_(MAXOBJPOOLSIZE), batchMu_(),
       rwLock_(), metaLock_(), mmapLock_(), statLock_(), readOnly_(false) {
         assert(pthread_rwlock_init(&mmapLock_, NULL) == 0);
@@ -49,12 +49,12 @@ DB::~DB() {
 
 int DB::Open(const Options &options) {
   if (file_ > 0) {
-    cout << "file already opened!" << endl;
+    LOG(INFO) << "file already opened!";
     return 0;
   }
   // 文件锁，不允许两个DB打开同一个文件
   if (!lock_file_.lock()) {
-    cout << "acquire file lock failed!" << endl;
+    LOG(INFO) << "acquire file lock failed!";
     return -1;
   }
 
@@ -74,14 +74,14 @@ int DB::Open(const Options &options) {
   }
   file_ = ::open(path_.c_str(), flag);
   if (-1 == file_) {
-    cout << "open file failed!" << endl;
+    LOG(ERROR) << "open file failed!";
     return -1;
   }
-  filesz_ = GetAvailableSpace(file_);
+  filesz_ = GetFileSize(file_);
   if (filesz_ == 0) {
     // first time to init a DB
-    if (!Init()) {
-      cout << "init DB failed!" << endl;
+    if (Init() != 0) {
+      LOG(ERROR) << "init DB failed!";
       DbClose();
       return -1;
     }
@@ -89,7 +89,7 @@ int DB::Open(const Options &options) {
   char buf[0x1000]{ 0 };
   auto ret = ::pread(file_, buf, sizeof(buf), 0);
   if (ret == -1) {
-    cout << "get meta page failed upon open db!" << endl;
+    LOG(ERROR) << "get meta page failed upon open db!";
     DbClose();
     return -1;
   }
@@ -100,6 +100,7 @@ int DB::Open(const Options &options) {
     pageSize_ = m->pageSize_;
   }
   if (initMeta(options.InitialMMapSize) == -1) {
+    LOG(ERROR) << "init Meta failed!";
     DbClose();
     return -1;
   }
@@ -131,9 +132,10 @@ int DB::initMeta(uint32_t InitialMMapSize) {
     unlockMmapLock();
     return -1;
   }
-  cout << "filesz_= " << filesz_ << endl;
+  LOG(INFO) << "initMeta filesz_= " << filesz_;
   auto targetSize = std::max(filesz_, InitialMMapSize);
   if (getMmapSize(targetSize) != 0) {
+    LOG(ERROR) << "get Mmap file size failed!";
     unlockMmapLock();
     return -1;
   }
@@ -144,11 +146,13 @@ int DB::initMeta(uint32_t InitialMMapSize) {
   }
   // unmap previous files
   if (!DbMunmap()) {
+    LOG(ERROR) << "un-map previous file failed!";
     unlockMmapLock();
     return -1;
   }
   // mmap file
-  if (mmapDbFile(targetSize)) {
+  if (!mmapDbFile(targetSize)) {
+    LOG(ERROR) << "mmap new file failed!";
     unlockMmapLock();
     return -1;
   }
@@ -157,6 +161,7 @@ int DB::initMeta(uint32_t InitialMMapSize) {
   meta1_ = getPagePtr(1)->metaPtr();
 
   if (!meta0_->validate() && !meta1_->validate()) {
+    LOG(ERROR) << "Validate meta failed!";
     unlockMmapLock();
     return -1;
   }
@@ -184,13 +189,14 @@ bool DB::DbMunmap() {
   if (!dataref_) {
     return true;
   }
+  LOG(INFO) << "current dataref_: " << dataref_;
   int ret = ::munmap(dataref_, datasz_);
   if (ret == -1) {
-    cout << "munmap failed!" << endl;
+    LOG(ERROR) << "munmap failed!";
     return false;
   }
   data_ = nullptr;
-  dataref_ = 0;
+  dataref_ = nullptr;
   datasz_ = 0;
   return true;
 }
@@ -200,6 +206,7 @@ bool DB::DbMunmap() {
 // Returns an error if the new mmap size is greater than the max allowed.
 int DB::getMmapSize(uint32_t &targetSize) {
   // from 32k up to 1G
+  LOG(INFO) << "mmap target size = " << targetSize;
   for (int i = 15; i <= 30; i++) {
     if (targetSize <= (1UL << i)) {
       targetSize = 1UL << i;
@@ -266,11 +273,11 @@ int DB::Init() {
 
   size_t size = writeAt(buf, sizeof(buf), 0);
   if (size != sizeof(buf)) {
-    cout << "init db failed!" << endl;
+    LOG(ERROR) << "write db file failed!";
     return -1;
   }
   if (!fileSync()) {
-    cout << "sync db file failed!" << endl;
+    LOG(ERROR) << "sync db file failed!";
   }
   filesz_ = size;
   return 0;
@@ -284,7 +291,7 @@ page *DB::pageInBuffer(char *ptr, size_t length, pgid pageId) {
 page *DB::allocate(uint32_t numPages, Tx *tx) {
   uint32_t len = numPages * pageSize_;
   assert(numPages < 0x1000);
-  cout << "allocating len: " << len  << endl;
+  LOG(INFO) << "allocating len: " << len ;
   // 操作在内存，现在不持久化
   auto ptr = reinterpret_cast<page*>(new char[len]); // TODO(roland): mempool
   ptr->overflow = numPages - 1;
@@ -293,7 +300,7 @@ page *DB::allocate(uint32_t numPages, Tx *tx) {
     ptr->id = pg;
     return ptr;
   }
-  cout << "not free page, try to mmap new page!" << endl;
+  LOG(INFO) << "not free page, try to mmap new page!";
   // ptr->id = rwtx_->metaData->totalPageNumber;
   // TODO
   return nullptr;

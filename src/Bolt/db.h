@@ -36,8 +36,8 @@ struct Options {
   bool NoGrowSync;
   bool ReadOnly;
   int MmapFlags;
-  int InitialMMapSize;
-  Options() : timeout(0), NoGrowSync(false) {}
+  uint32_t InitialMMapSize;
+  Options() : timeout(0), NoGrowSync(false), InitialMMapSize(0) {}
 };
 
 class DB {
@@ -52,7 +52,7 @@ public:
       char *buf, size_t len, off_t offset) {
     auto ret = ::pwrite(file_, buf, len, offset);
     if (ret == -1) {
-      cout << "pwrite" << endl;
+      LOG(INFO) << "pwrite";
     }
     return ret;
   };

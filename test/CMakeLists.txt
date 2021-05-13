@@ -42,7 +42,7 @@ foreach(test_src ${test_srcs} )
     MESSAGE(STATUS "building test: ${test_name}")
     set(all_tests "${all_tests} ${test_name}")
     # link libraries
-    target_link_libraries(${test_name} bolt gtest)
+    target_link_libraries(${test_name} bolt gtest glog)
 
     # set target properties
     set_target_properties(${test_name}

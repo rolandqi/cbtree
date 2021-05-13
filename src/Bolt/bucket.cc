@@ -11,11 +11,11 @@ Node *Bucket::getCachedNode(pgid pgid) {
 }
 
 void Bucket::dereference() {
-  if (rootNode_) {
-    rootNode_->root()->dereference();
-  }
+  // if (rootNode_) {
+  //   rootNode_->root()->dereference();
+  // }
 
-  for (auto it : buckets_) {
-    it.second->dereference();
-  }
+  // for (auto it : buckets_) {
+  //   it.second->dereference();
+  // }
 }

@@ -2,6 +2,7 @@
 #define UTIL_H_
 
 #include "sys/file.h"
+#include <glog/logging.h>
 #include <iostream>
 #include <unistd.h>
 #include <string>
@@ -20,7 +21,7 @@ public:
   bool lock() {
     fd_ = ::open(lock_file_.c_str(), O_RDWR | O_CREAT, 0600);
     if (fd_ < 0) {
-      cout << "open lock file failed, file name:" << lock_file_ << endl;
+      LOG(INFO) << "open lock file failed, file name:" << lock_file_;
       ;
     }
     if (0 == flock(fd_, LOCK_EX | LOCK_NB)) {
@@ -31,7 +32,7 @@ public:
       fd_ = -1;
       return false;
     } else {
-      cout << "lock file error" << endl;
+      LOG(INFO) << "lock file error";
       ;
       close(fd_);
       fd_ = -1;
