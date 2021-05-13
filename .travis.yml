@@ -1,7 +1,8 @@
 sudo: required
 language: cpp
 
-#before_script:
-#  - sh install_grpc.sh
+before_install:
+  - yum install gflags-devel.x86_64
+  - yum install glog-devel.x86_64
 
 script: sh build.sh

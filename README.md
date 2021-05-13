@@ -9,8 +9,8 @@ implement several b-tree structures in c++.
 
 ### implementation
 
-[x] 1. page(meta/freelist/data) management
-[x] 2. gtest/glog capability
-[ ] 3. bucket/node(B+Tree) management
-[ ] 4. unit test
-[ ] 5. performance test
+[x] - page(meta/freelist/data) management
+[x] - gtest/glog capability
+[ ] - bucket/node(B+Tree) management
+[ ] - unit test
+[ ] - performance test
