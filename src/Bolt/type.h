@@ -8,6 +8,7 @@
 #include <functional>
 #include <assert.h>
 #include <glog/logging.h>
+#include <cstddef>
 
 using namespace std;
 
