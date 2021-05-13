@@ -2,7 +2,7 @@ sudo: required
 language: cpp
 
 before_install:
-  - apt-get -y install gflags-devel.x86_64
-  - apt-get -y install glog-devel.x86_64
+  - sudo apt-get -y install gflags-devel.x86_64
+  - sudo apt-get -y install glog-devel.x86_64
 
 script: sh build.sh
