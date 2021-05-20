@@ -25,8 +25,8 @@ public:
     real_size_ = ((obj_size_ * obj_cnt_ - 1) / alignment + 1) * alignment;
     int ret = posix_memalign((void **)&mem_ptr_, alignment, real_size_);
     if (ret != 0) {
-      LOG(INFO) << "Failed to malloc ret: " << ret << ", size=" << obj_size_ << "*"
-           << obj_cnt_;
+      LOG(INFO) << "Failed to malloc ret: " << ret << ", size=" << obj_size_
+                << "*" << obj_cnt_;
       mem_ptr_ = nullptr;
       return;
     }

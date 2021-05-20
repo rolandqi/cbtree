@@ -3,6 +3,9 @@
 
 #include "type.h"
 #include "meta.h"
+#include "bucket.h"
+
+struct meta;
 
 struct TxStat {
   uint64_t pageCount = 0;
@@ -25,32 +28,47 @@ struct TxStat {
 };
 
 // 代表某个只读read-only或者读写read-write事务
-class Tx {
+class Tx : public std::enable_shared_from_this<Tx> {
 public:
   Tx();
   ~Tx();
-  Tx(const Tx&) = delete;
-  bool isWritable() const { return writeable_; }
-  void setWriteable(bool writeable) { writeable_ = writeable; }
+  Tx(const Tx &) = delete;
+  bool isWritable() const { return writable_; }
+  void setWriteable(bool writeable) { writable_ = writeable; }
   void increaseCurserCount() { stats_.cursorCount++; }
   void increaseNodeCount() { stats_.nodeCount++; }
-  page *allocate(size_t count);
-  page *getPage(pgid pageId);
+  Page *allocate(uint32_t count);
+  Page *getPage(pgid pageId);
   // 只有写事务在提交事务时，其在事务期间受到操作的数据才需要重新分配新的page来存储
   // 而他们原本所在的page会被pending，在事务完成期间并不会被释放到ids里
   int commit();
   void init(DB *db);
   int rollback();
-  
+  Bucket *getBucket(const Item &name);
+  Bucket *createBucket(const Item &name);
+  Bucket *createBucketIfNotExists(const Item &name);
+  int deleteBucket(const Item &name);
+  void free(txid tid, Page *Page);
+  txid getTxId() { return metaData_->txid_; }
+  uint32_t getTotalPageNumber() { return metaData_->totalPageNumber_; }
+  void for_each_page(pgid pageId, int depth, std::function<void(Page *, int)>);
+  void addCommitHandle(std::function<void()> fn) {
+    commitHandlers_.push_back(fn);
+  }
+  int writeMeta();
+  int write();
+  // int isFreelistCheckOK();
+  // bool isBucketsRemainConsistent(Bucket &bucket, std::map<pgid, Page *>
+  // &reachable,
+  //                                std::map<pgid, bool> &freed);
 private:
-  bool writeable_;
+  bool writable_;
   bool managed_;
   DB *db_;
   meta *metaData_;
-  Bucket rootBucket_;
-  std::unordered_map<pgid, page *> dirtyPageTable_;  // 只有写事务需要
-  std::vector<std::function<void()>> commitHandlers_;
-  bool writeFlag_;
+  Bucket rootBucket_;                               // meta表中的根bucket
+  std::unordered_map<pgid, Page *> dirtyPageTable_; // 只有写事务需要
+  std::vector<std::function<void()> > commitHandlers_;
   TxStat stats_;
   // MemoryPool pool_;
   friend class DB;

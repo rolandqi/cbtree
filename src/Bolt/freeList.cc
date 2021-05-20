@@ -1,20 +1,22 @@
 #include "freeList.h"
+#include "page.h"
 #include <vector>
 #include <algorithm>
 #include <iostream>
 
-	template<typename T>
-	void print(const T &a){
-    std::stringstream ss;
-		typename T::const_iterator iter = a.begin();
-		for(; iter != a.end(); iter++){
-			ss <<*iter<<", ";
-		}
-		LOG(INFO) << ss.str();
-	}
+template <typename T> void print(const T &a) {
+  std::stringstream ss;
+  typename T::const_iterator iter = a.begin();
+  for (; iter != a.end(); iter++) {
+    ss << *iter << ", ";
+  }
+  LOG(INFO) << ss.str();
+}
+
+freeList::freeList() : ids_(), pending_(), cache_() {}
 
 // |page haeder|pgid|pgid|...|
-void freeList::read(page *page) {
+void freeList::read(Page *page) {
   size_t index = 0;
   size_t count = page->count;
   // If the page.count is at the max uint16 value (64k) then it's considered
@@ -39,7 +41,7 @@ void freeList::read(page *page) {
 }
 
 // 溢出之后需要重新分配page
-void freeList::write(page *page) {
+void freeList::write(Page *page) {
   page->flag |= pageFlags::freelistPageFlag;
   auto cnt = count();
   if (cnt == 0) {
@@ -100,14 +102,14 @@ void freeList::copyall(std::vector<pgid> *dest) {
 void freeList::mergeids_(vector<pgid> *dest, const vector<pgid> &src) {
   auto it1 = src.begin();
   auto it2 = ids_.begin();
-  while (it1 != src.end() || it2 != ids_.end()) {
+  while (it1 != src.end() && it2 != ids_.end()) {
     if (*it1 < *it2) {
       dest->push_back(*it1++);
     } else {
       dest->push_back(*it2++);
     }
   }
-  if (it1!=src.end()) {
+  if (it1 != src.end()) {
     dest->insert(dest->end(), it1, src.end());
   }
   if (it2 != ids_.end()) {
@@ -140,7 +142,7 @@ pgid freeList::allocate(uint32_t numPages) {
       init = id;
     }
 
-    if (id - init + 1 == numPages ) {
+    if (id - init + 1 == numPages) {
       LOG(INFO) << "before erase: ";
       print(ids_);
       ids_.erase(ids_.begin() + i - numPages + 1, ids_.begin() + i + 1);
@@ -205,7 +207,8 @@ void freeList::rollback(txid txid) {
   pending_.erase(txid);
 }
 
-void freeList::free(txid txid, page *p) {
+// 将free的page放到pending中
+void freeList::free(txid txid, Page *p) {
   if (p->id <= 1) {
     LOG(INFO) << "ERROR! cannot free page " << p->id;
   }
@@ -227,10 +230,10 @@ void freeList::reset() {
   cache_.clear();
 }
 
-void freeList::reload(page *pg) {
+void freeList::reload(Page *pg) {
   read(pg);
 
-	// Build a cache of only pending pages.
+  // Build a cache of only pending pages.
   unordered_map<pgid, bool> curPending;
   for (auto item : pending_) {
     for (auto inner : item.second) {
@@ -238,8 +241,8 @@ void freeList::reload(page *pg) {
     }
   }
 
-	// Check each page in the freelist and build a new available freelist
-	// with any pages not in the pending lists.
+  // Check each page in the freelist and build a new available freelist
+  // with any pages not in the pending lists.
   std::vector<pgid> newIds;
   for (auto item : ids_) {
     if (curPending.find(item) == curPending.end()) {

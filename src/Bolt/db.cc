@@ -1,5 +1,6 @@
 #include "db.h"
 #include "bucket.h"
+#include "page.h"
 #include "util.h"
 #include <file_util.h>
 #include <unistd.h>
@@ -35,12 +36,13 @@ bool meta::validate() {
 }
 
 DB::DB(const string &path)
-    : StrictMode_(false), NoSync_(false), NoGrowSync_(false), path_(path), lock_file_(path_ + "_lock"), dataref_(nullptr), data_(nullptr), freeList_(new freeList()), bucketPool_(MAXOBJPOOLSIZE),
+    : StrictMode_(false), NoSync_(false), NoGrowSync_(false), path_(path),
+      lock_file_(path_ + "_lock"), dataref_(nullptr), data_(nullptr),
+      freeList_(new freeList()), bucketPool_(MAXOBJPOOLSIZE),
       cursorPool_(MAXOBJPOOLSIZE), nodePool_(MAXOBJPOOLSIZE), batchMu_(),
       rwLock_(), metaLock_(), mmapLock_(), statLock_(), readOnly_(false) {
-        assert(pthread_rwlock_init(&mmapLock_, NULL) == 0);
-
-      }
+  assert(pthread_rwlock_init(&mmapLock_, NULL) == 0);
+}
 
 DB::~DB() {
   DbClose();
@@ -169,8 +171,8 @@ int DB::initMeta(uint32_t InitialMMapSize) {
   return 0;
 }
 
-page *DB::getPagePtr(pgid pgid) {
-  return reinterpret_cast<page *>(&data_[pgid * pageSize_]);
+Page *DB::getPagePtr(pgid pgid) {
+  return reinterpret_cast<Page *>(&data_[pgid * pageSize_]);
 }
 
 bool DB::mmapDbFile(int targetSize) {
@@ -179,7 +181,7 @@ bool DB::mmapDbFile(int targetSize) {
     return false;
   }
   ::madvise(ptr, targetSize, MADV_RANDOM);
-  data_ = reinterpret_cast<decltype(data_) >(ptr);
+  data_ = reinterpret_cast<decltype(data_)>(ptr);
   dataref_ = ptr;
   datasz_ = targetSize;
   return true;
@@ -223,7 +225,7 @@ void DB::DbClose() {
   std::lock_guard<std::mutex> guard1(rwLock_);
   std::lock_guard<std::mutex> guard2(metaLock_);
   getMmapRLock();
-  
+
   if (!opened_) {
     return;
   }
@@ -245,7 +247,7 @@ int DB::Init() {
 
   // meta
   for (int i = 0; i < 2; ++i) {
-    page *p = pageInBuffer(buf, sizeof(buf), i);
+    Page *p = pageInBuffer(buf, sizeof(buf), i);
     p->id = i;
     p->flag = pageFlags::metaPageFlag;
     meta *m = p->metaPtr();
@@ -253,7 +255,7 @@ int DB::Init() {
     m->version_ = VERSION;
     m->pageSize_ = pageSize_;
     m->freeListPageNumber_ = 2;
-    m->root_ = bucket{ 3, 0 };
+    m->root_ = bucketHeader{ 3, 0 };
     m->totalPageNumber_ = 4;
     m->txid_ = i;
     m->checksum_ = 0; // TODO(roland):checksum
@@ -283,32 +285,33 @@ int DB::Init() {
   return 0;
 }
 
-page *DB::pageInBuffer(char *ptr, size_t length, pgid pageId) {
+Page *DB::pageInBuffer(char *ptr, size_t length, pgid pageId) {
   assert(length > pageId * pageSize_);
-  return reinterpret_cast<page *>(ptr + pageId * pageSize_);
+  return reinterpret_cast<Page *>(ptr + pageId * pageSize_);
 }
 
-page *DB::allocate(uint32_t numPages, Tx *tx) {
+Page *DB::allocate(uint32_t numPages, TxPtr tx) {
   uint32_t len = numPages * pageSize_;
   assert(numPages < 0x1000);
-  LOG(INFO) << "allocating len: " << len ;
+  LOG(INFO) << "allocating len: " << len;
   // 操作在内存，现在不持久化
-  auto ptr = reinterpret_cast<page*>(new char[len]); // TODO(roland): mempool
+  auto ptr = reinterpret_cast<Page *>(new char[len]); // TODO(roland): mempool
   ptr->overflow = numPages - 1;
   pgid pg = freeList_->allocate(numPages);
   if (pg != 0) {
     ptr->id = pg;
     return ptr;
   }
-  LOG(INFO) << "not free page, try to mmap new page!";
-  // ptr->id = rwtx_->metaData->totalPageNumber;
+  LOG(INFO) << "not free Page, try to mmap new Page!";
+  // ptr->id = rwtx_->metaData->totalPageNumber_;
   // TODO
   return nullptr;
 }
 
-int DB::update(std::function<int(Tx *tx)> fn) {
-  Tx *tx = beginRWTx();
+int DB::update(std::function<int(TxPtr tx)> fn) {
+  TxPtr tx = beginRWTx();
   if (tx == nullptr) {
+    LOG(ERROR) << "construct update transaction failed!";
     return -1;
   }
   tx->managed_ = true;
@@ -320,21 +323,48 @@ int DB::update(std::function<int(Tx *tx)> fn) {
   }
 
   auto result = tx->commit();
-  // TODO
-  // closeTx(tx);
+  closeTx(tx);
   return result;
 }
 
-int DB::view(std::function<int(Tx *tx)> fn) {
-  return 0;
+void DB::closeTx(TxPtr tx) {
+  if (tx == nullptr) {
+    return;
+  }
+  if (rwtx_ && rwtx_ == tx) {
+    resetRWTX();
+    writerLeave(); // 解锁
+  } else {
+    removeTx(tx);
+  }
 }
 
-Tx *DB::beginRWTx() {
+void DB::resetRWTX() { rwtx_ = nullptr; }
+
+void DB::writerLeave() { rwLock_.unlock(); }
+
+void DB::removeTx(TxPtr tx) {
+  unlockMmapLock();
+  std::lock_guard<std::mutex> guard(metaLock_);
+
+  for (auto iter = txs_.begin(); iter != txs_.end(); iter++) {
+    if (*iter == tx) {
+      txs_.erase(iter);
+      return;
+    }
+  }
+  LOG(WARNING) << "tx not found!";
+}
+
+int DB::view(std::function<int(TxPtr tx)> fn) { return 0; }
+
+TxPtr DB::beginRWTx() {
   if (readOnly_) {
     return nullptr;
   }
 
-  // 本函数内不会解锁，只有在commit/rollback后才会接锁。保证同一时间只有一个RW transaction.
+  // 本函数内不会解锁，只有在commit/rollback后才会接锁。保证同一时间只有一个RW
+  // transaction.
   rwLock_.lock();
 
   // MDL
@@ -344,11 +374,11 @@ Tx *DB::beginRWTx() {
     rwLock_.unlock();
     return nullptr;
   }
-  rwtx_ = new Tx();
+  rwtx_ = make_shared<Tx>();
   rwtx_->setWriteable(true);
   rwtx_->init(this);
 
-	// Free any pages associated with closed read-only transactions.
+  // Free any pages associated with closed read-only transactions.
   // 写事务开始时，其他事务肯定已经完成了
   auto minId = UINT64_MAX;
   for (auto &it : txs_) {
@@ -357,24 +387,15 @@ Tx *DB::beginRWTx() {
 
   //暂存在pending中的page小于最小txid的都释放到free中
   if (minId > 0) {
-    freeList_->release(minId - 1);  // 注意这个-1
+    freeList_->release(minId - 1); // 注意这个-1
   }
   return rwtx_;
 }
 
-Tx *DB::beginTx() {
-  return nullptr;
-}
+TxPtr DB::beginTx() { return nullptr; }
 
-bool DB::getMmapRLock() {
-  return pthread_rwlock_rdlock(&mmapLock_) == 0;
-}
+bool DB::getMmapRLock() { return pthread_rwlock_rdlock(&mmapLock_) == 0; }
 
-bool DB::getMmapWLock() {
-  return pthread_rwlock_wrlock(&mmapLock_) == 0;
+bool DB::getMmapWLock() { return pthread_rwlock_wrlock(&mmapLock_) == 0; }
 
-}
-
-bool DB::unlockMmapLock() {
-  return pthread_rwlock_unlock(&mmapLock_) == 0;
-}
+bool DB::unlockMmapLock() { return pthread_rwlock_unlock(&mmapLock_) == 0; }

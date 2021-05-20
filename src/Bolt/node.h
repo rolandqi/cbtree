@@ -6,12 +6,12 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <memory>
 
-class Node;
-struct bucket;
+struct bucketHeader;
 class Bucket;
 
-typedef std::vector<Node *> NodeList;
+typedef std::vector<NodePtr> NodeList;
 
 // this is a pointer to element. The element can be in a page or not added to a
 // page yet. 1.points to an element in a page 2.points to an element not yet in
@@ -24,77 +24,79 @@ struct Inode {
   pgid pageId = 0;
   Item key;
   Item value;
-  Item Key() const { return key; }
-  Item Value() const { return value; }
 };
 
 typedef std::vector<Inode> InodeList;
 
-class page;
+class Page;
 class Bucket;
 // this is a in-memory deserialized page
 // 一个页抽象出来的数据结构
-class Node {
+class Node : public std::enable_shared_from_this<Node> {
   friend class ElementRef;
 
+public:
+  explicit Node(Bucket *b, NodePtr parentNode);
+  /**
+   * setter
+   */
+  void markLeaf() { isLeaf_ = true; }
+  void setBucket(Bucket *b) { bucket_ = b; }
+  void setParentNode(NodePtr p) { parentNode_ = p; }
+  void addChild(NodePtr c) { children_.push_back(c); }
+
+  /**
+   * getter
+   */
+  pgid getPageId() const { return pageId_; }
+  Inode getInode(size_t idx) { return inodeList_[idx]; }
+  bool isLeafNode() const { return isLeaf_; }
+  std::vector<pgid> branchPageIds();
+
+  uint32_t search(const Item &key, bool &found);
+  bool isinlineable(uint32_t maxInlineBucketSize) const;
+
+  //   void do_remove(const Item &key);
+  // return size of deserialized Node
+  uint32_t size() const;
+  uint32_t pageElementSize() const;
+  NodePtr root();     // 返回最顶层的node
+  uint32_t minKeys(); // returns the minimum number of inodes this node
+                      // should have.
+  bool sizeLessThan(uint32_t s) const;
+  uint32_t childIndex(NodePtr child);
+  //   size_t numChildren() const;
+  NodePtr nextSibling();
+  NodePtr prevSibling();
+  bool put(const Item &oldKey, const Item &newKey, const Item &value,
+           pgid pageId, uint32_t flag);
+  bool del(const Item &key);
+  void read(Page *page);
+  void write(Page *page);
+  NodePtr childAt(int index); // 返回一个children node
+  void free();
+  void removeChild(NodePtr target);
+  void dereference();
+  bool spill();
+  NodeList split(uint32_t pageSize);
+  std::pair<NodePtr, NodePtr> splitTwo(uint32_t pageSize);
+  uint32_t splitIndex(uint32_t threshold); // return the size of the first page.
+  void rebalance();
+  uint32_t numChildren() { return inodeList_.size(); }
+  uint32_t binarySearch(const InodeList &target, const Item &key, bool &found);
+  void do_remove(const Item &key);
+
+private:
   Bucket *bucket_;
   bool isLeaf_;
   bool unbalanced_;
   bool spilled_;
   Item key_;
   pgid pageId_;
-  Node *parentNode_;
-  NodeList children_;   // 子节点的指针
-  InodeList inodeList_; // 数据节点
-
-public:
-  explicit Node(Bucket *b, Node *p);
-  //   /**
-  //    * setter
-  //    */
-  //   void markLeaf() { isLeaf = true; }
-  //   void setBucket(Bucket *b) { bucket = b; }
-  //   void setParent(Node *p) { parentNode = p; }
-  //   void addChild(Node *c) { children.push_back(c); }
-
-  //   /**
-  //    * getter
-  //    */
-  //   pgid getPageId() const { return pageId; }
-  //   Inode getInode(size_t idx) { return inodeList[idx]; }
-  //   bool isLeafNode() const { return isLeaf; }
-  //   std::vector<pgid> branchPageIds();
-
-  //   size_t search(const Item &key, bool &found);
-  //   bool isinlineable(size_t maxInlineBucketSize) const;
-
-  //   void read(page *page);
-  //   Node *childAt(uint64_t index);
-  //   void do_remove(const Item &key);
-  //   // return size of deserialized Node
-  //   size_t size() const;
-  //   size_t pageElementSize() const;
-  //   Node *root();
-  //   size_t minKeys() const;
-  //   bool sizeLessThan(size_t s) const;
-  //   size_t childIndex(Node *child) const;
-  //   size_t numChildren() const;
-  //   Node *nextSibling();
-  //   Node *prevSibling();
-  //   void put(const Item &oldKey, const Item &newKey, const Item &value,
-  //            pgid pageId, uint32_t flag);
-  //   void del(const Item &key);
-  //   void write(page *page);
-  //   std::vector<Node *> split(size_t pageSize);
-  //   void splitTwo(size_t pageSize, Node *&a, Node *&b);
-  //   size_t splitIndex(size_t threshold);  // sz is return value. it's the
-  // size of the first page.
-  //   void free();
-  //   void removeChild(Node *target);
-  void dereference();
-  Node *root();
-  //   int spill();
-  //   void rebalance();
+  NodePtr parentNode_;
+  NodeList children_; // 新增的子node才会放到children_里，后面去spill
+  InodeList
+  inodeList_; // 数据节点，里面存放的数据是调用方提供的，存放一份数据的拷贝（TODO(roland):免拷优化）
 };
 
 #endif // NODE_H_

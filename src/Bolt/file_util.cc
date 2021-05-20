@@ -19,8 +19,7 @@
 
 __thread char t_errnobuf[512];
 
-const char* strerror_tl(int savedErrno)
-{
+const char *strerror_tl(int savedErrno) {
   return strerror_r(savedErrno, t_errnobuf, sizeof t_errnobuf);
 }
 
@@ -108,10 +107,8 @@ ReadSmallFile::~ReadSmallFile() {
 
 // return errno
 template <typename String>
-int ReadSmallFile::readToString(int maxSize, String *content,
-                                          int64_t *fileSize,
-                                          int64_t *modifyTime,
-                                          int64_t *createTime) {
+int ReadSmallFile::readToString(int maxSize, String *content, int64_t *fileSize,
+                                int64_t *modifyTime, int64_t *createTime) {
   static_assert(sizeof(off_t) == 8, "_FILE_OFFSET_BITS = 64");
   assert(content != NULL);
   int err = err_;
@@ -172,11 +169,8 @@ int ReadSmallFile::readToBuffer(int *size) {
   return err;
 }
 
-template int readFile(StringArg filename, int maxSize,
-                                std::string *content, int64_t *, int64_t *,
-                                int64_t *);
+template int readFile(StringArg filename, int maxSize, std::string *content,
+                      int64_t *, int64_t *, int64_t *);
 
-template int ReadSmallFile::readToString(int maxSize,
-                                                   std::string *content,
-                                                   int64_t *, int64_t *,
-                                                   int64_t *);
+template int ReadSmallFile::readToString(int maxSize, std::string *content,
+                                         int64_t *, int64_t *, int64_t *);

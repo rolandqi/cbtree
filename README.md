@@ -6,6 +6,8 @@ implement several b-tree structures in c++.
 
 ## boltDB
 
+[BoltDB源码分析](doc/bolt_analysis_cn.md)
+
 1. using mmap file to manange page.
 2. tx->commit->allocate(tx->DB->freepage)
 
@@ -13,6 +15,14 @@ implement several b-tree structures in c++.
 
 - [x] page(meta/freelist/data) management
 - [x] gtest/glog capability
-- [ ] bucket/node(B+Tree) management
+- [x] node management
+- [x] transaction
+- [x] bucket(B+Tree) management
 - [ ] unit test
-- [ ] performance testß
+- [ ] performance test
+
+### TODO
+
+- [ ] better memory management (avoid some copy)
+- [ ] palm
+- [ ] transaction manager

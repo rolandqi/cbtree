@@ -5,7 +5,7 @@ set(CBTree_VERSION_MAJOR 0)
 set(CBTree_VERSION_MINOR 1)
 
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_FLAGS_DEBUG "-O3 -g -fsanitize=address -static-libasan -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS_DEBUG "-O -g -fsanitize=address -static-libasan -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DNDEBUG")
 

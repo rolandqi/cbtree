@@ -9,6 +9,7 @@
 #include "file_util.h"
 #include "util.h"
 #include "tx.h"
+#include "page.h"
 #include <pthread.h>
 #include <obj_pool.h>
 #include <stdio.h>
@@ -37,7 +38,9 @@ struct Options {
   bool ReadOnly;
   int MmapFlags;
   uint32_t InitialMMapSize;
-  Options() : timeout(0), NoGrowSync(false), InitialMMapSize(0) {}
+  Options()
+      : timeout(0), NoGrowSync(false), ReadOnly(false), MmapFlags(0),
+        InitialMMapSize(0) {}
 };
 
 class DB {
@@ -47,7 +50,7 @@ public:
   int Open(const Options &options);
   int Init();
   void DbClose();
-  page *pageInBuffer(char *ptr, size_t length, pgid pageId);
+  Page *pageInBuffer(char *ptr, size_t length, pgid pageId);
   const std::function<ssize_t(char *, size_t, off_t)> writeAt = [this](
       char *buf, size_t len, off_t offset) {
     auto ret = ::pwrite(file_, buf, len, offset);
@@ -58,20 +61,30 @@ public:
   };
   inline bool fileSync() { return fdatasync(file_) == 0; }
   inline freeList *getFreeList() { return freeList_; }
+  uint32_t getPageSize() { return pageSize_; }
   int initMeta(uint32_t InitialMMapSize);
   meta *getMeta();
   int getMmapSize(uint32_t &targetSize);
   bool DbMunmap();
   bool mmapDbFile(int targetSize);
-  page *getPagePtr(pgid pgid);
-  page *allocate(uint32_t numPages, Tx *tx);  // 分配numPages个连续的页，返回第一个页的指针
-  int update(std::function<int(Tx *tx)> fn);
-  int view(std::function<int(Tx *tx)> fn);
-  Tx *beginRWTx();  // 数据库不支持update事务并发
-  Tx *beginTx();
-  bool getMmapRLock();  // 阻塞，没有超时时间
-  bool getMmapWLock();  // 阻塞
+  Page *getPagePtr(pgid pgid);
+  Page *allocate(uint32_t numPages,
+                 TxPtr tx); // 分配numPages个连续的页，返回第一个页的指针
+  int update(std::function<int(TxPtr tx)> fn);
+  int view(std::function<int(TxPtr tx)> fn);
+  TxPtr beginRWTx(); // 数据库不支持update事务并发
+  TxPtr beginTx();
+  void closeTx(TxPtr tx);
+  void removeTx(TxPtr tx);
+  bool getMmapRLock(); // 阻塞，没有超时时间
+  bool getMmapWLock(); // 阻塞
   bool unlockMmapLock();
+  void resetRWTX();
+  void writerLeave();
+  bool isNoSync() { return NoSync_; }
+  uint32_t freeListSerialSize() const { return freeList_->size(); }
+  int grow(uint32_t sz);
+  int getFd() const { return file_; }
 
 private:
   bool StrictMode_;
@@ -92,8 +105,8 @@ private:
   meta *meta1_;
   uint32_t pageSize_;
   bool opened_;
-  Tx *rwtx_;
-  vector<Tx *> txs_;
+  TxPtr rwtx_;
+  vector<TxPtr> txs_;
   freeList *freeList_;
   // Stats stats_;  // for performance
   ObjPool<Bucket> bucketPool_; // 线程安全的对象池
@@ -108,7 +121,7 @@ private:
   * 读锁和写锁之前互斥，如果已经有了写锁，下一个写锁必须等所有的锁都unlock之后才能持有写锁
   * 如果没有写锁，写锁也需要等所有的锁unlock之后才能持有写锁
   */
-  pthread_rwlock_t mmapLock_; // 应该用读写锁实现
+  pthread_rwlock_t mmapLock_;
   std::mutex statLock_;
   bool readOnly_;
 };

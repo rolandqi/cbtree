@@ -1,3 +1,6 @@
-./build/*
-./.vscode*
-./.vscode
+build/*
+.vscode*
+.vscode
+GPATH
+GRTAGS
+GTAGS
