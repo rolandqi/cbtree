@@ -47,7 +47,7 @@ TEST(dbtest, freeListTest) {
   std::unique_ptr<freeList> f(new freeList());
   pgid index = 12;
   uint32_t overflow = 3;
-  Page p{ .id = index, .overflow = overflow };
+  Page p{ .id = index, .flag=0, .count=0, .overflow = overflow };
   f->free(100, &p);
   auto it = f->pending_[100].begin();
   for (uint32_t i = 0; i <= overflow; i++) {
