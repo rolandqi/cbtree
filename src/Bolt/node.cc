@@ -605,3 +605,11 @@ void Node::do_remove(const Item &key) {
 
   unbalanced_ = true; // need re-balance
 }
+
+std::vector<pgid> Node::branchPageIds() {
+  std::vector<pgid> result;
+  for (auto &item : inodeList_) {
+    result.push_back(item.pageId);
+  }
+  return result;
+}

@@ -31,7 +31,7 @@ struct TxStat {
 class Tx : public std::enable_shared_from_this<Tx> {
 public:
   Tx();
-  ~Tx();
+  ~Tx() {}
   Tx(const Tx &) = delete;
   bool isWritable() const { return writable_; }
   void setWriteable(bool writeable) { writable_ = writeable; }

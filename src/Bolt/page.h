@@ -13,14 +13,14 @@ struct Page { // 每个page的头
   // 指向页表头数据结尾，也就是页面数据的起始位置。
   char ptr[0];
   meta *metaPtr() { return reinterpret_cast<meta *>(ptr); }
-  leafPageElement *getLeafPageElement(uint64_t index) const {
-    const auto *list = reinterpret_cast<const leafPageElement *>(&ptr);
-    return const_cast<leafPageElement *>(&list[index]);
+  leafPageElement *getLeafPageElement(uint64_t index) {
+    auto *list = reinterpret_cast<leafPageElement *>(&ptr);
+    return static_cast<leafPageElement *>(&list[index]);
   }
 
-  branchPageElement *getBranchPageElement(uint64_t index) const {
-    const auto *list = reinterpret_cast<const branchPageElement *>(&ptr);
-    return const_cast<branchPageElement *>(&list[index]);
+  branchPageElement *getBranchPageElement(uint64_t index) {
+    auto *list = reinterpret_cast<branchPageElement *>(&ptr);
+    return static_cast<branchPageElement *>(&list[index]);
   }
 } __attribute__((packed));
 
