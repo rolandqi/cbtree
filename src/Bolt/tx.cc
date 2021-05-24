@@ -11,13 +11,16 @@ static int file_data_sync(int fd) {
 
 Tx::Tx()
     : writable_(false), managed_(false), db_(nullptr), metaData_(nullptr),
-      rootBucket_(shared_from_this()) {}
+      rootBucket_() {
+  // rootBucket_.reset(new Bucket(shared_from_this()));
+}
 
-void Tx::init(DB *db_) {
-  db_ = db_;
+void Tx::init(DB *db) {
+  rootBucket_.reset(new Bucket(shared_from_this()));
+  db_ = db;
   // 创建事务就是把db中的元数据赋值一份到tx中，这些元数据写的过程中会变化，为了保护之前的数据一致性不被破坏，这里需要拷贝一份新数据，事务提交之后使用tx中的数据在把db中数据覆盖一遍。
   metaData_ = db_->getMeta()->clone(); //对db中的mate做个快照
-  rootBucket_.setBucketHeader(metaData_->root_);
+  rootBucket_->setBucketHeader(metaData_->root_);
   if (writable_) {
     metaData_->txid_ += 1;
   }
@@ -39,25 +42,29 @@ int Tx::rollback() {
 
 int Tx::commit() {
   if (managed_) {
+    LOG(ERROR) << "transaction not managed!";
     return -1;
   }
   if (db_ == nullptr || !isWritable()) {
+    LOG(ERROR) << "invalid parameter.";
     return -1;
   }
 
   // Rebalance nodes which have had deletions.
-  rootBucket_.rebalance();
-  if (rootBucket_.spill()) {
+  rootBucket_->rebalance();
+  if (!rootBucket_->spill()) {
+    LOG(ERROR) << "root bucket spill failed!";
     rollback();
     return -1;
   }
 
-  metaData_->root_.root = rootBucket_.getRootPage();
-  auto pgid = metaData_->totalPageNumber_;
+  metaData_->root_.root = rootBucket_->getRootPage();
+  auto pageId = metaData_->totalPageNumber_;
 
   free(metaData_->txid_, db_->getPagePtr(metaData_->freeListPageNumber_));
   auto page = allocate((db_->freeListSerialSize() / 4096) + 1);
   if (page == nullptr) {
+    LOG(ERROR) << "can not allcate contigious pages durning commit.";
     rollback();
     return -1;
   }
@@ -70,23 +77,27 @@ int Tx::commit() {
 
   metaData_->freeListPageNumber_ = page->id;
 
-  if (metaData_->totalPageNumber_ > pgid) {
+  if (metaData_->totalPageNumber_ > pageId) {
     if (db_->grow((metaData_->totalPageNumber_ + 1) * db_->getPageSize())) {
+      LOG(ERROR) << "grow page failed!";
       rollback();
       return -1;
     }
   }
 
   if (write() != 0) {
+    LOG(ERROR) << "Write commit data failed!";
     rollback();
     return -1;
   }
 
   if (writeMeta() != 0) {
+    LOG(ERROR) << "write committed meta failed!";
     rollback();
     return -1;
   }
 
+  // for now we don't have any commit handles.
   for (auto &item : commitHandlers_) {
     item();
   }
@@ -95,19 +106,19 @@ int Tx::commit() {
 }
 
 Bucket *Tx::getBucket(const Item &name) {
-  return rootBucket_.getBucketByName(name);
+  return rootBucket_->getBucketByName(name);
 }
 
 Bucket *Tx::createBucket(const Item &name) {
-  return rootBucket_.createBucket(name);
+  return rootBucket_->createBucket(name);
 }
 
 Bucket *Tx::createBucketIfNotExists(const Item &name) {
-  return rootBucket_.createBucketIfNotExists(name);
+  return rootBucket_->createBucketIfNotExists(name);
 }
 
 int Tx::deleteBucket(const Item &name) {
-  rootBucket_.deleteBucket(name);
+  rootBucket_->deleteBucket(name);
   return 0;
 }
 
@@ -162,12 +173,14 @@ int Tx::writeMeta() {
   Page *page = reinterpret_cast<Page *>(tmp.data());
   metaData_->write(page);
 
-  if (db_->writeAt(tmp.data(), tmp.size(), page->id * 4096 != tmp.size())) {
+  if (db_->writeAt(tmp.data(), tmp.size(), page->id * 4096) != tmp.size()) {
+    LOG(ERROR) << "writeAt meta failed!";
     return -1;
   }
 
   if (!db_->isNoSync()) {
     if (file_data_sync(db_->getFd())) {
+      LOG(ERROR) << "meta sync failed!";
       return -1;
     }
   }

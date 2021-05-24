@@ -51,6 +51,7 @@ public:
   void free(txid tid, Page *Page);
   txid getTxId() { return metaData_->txid_; }
   uint32_t getTotalPageNumber() { return metaData_->totalPageNumber_; }
+  meta *getMeta() { return metaData_; }
   void for_each_page(pgid pageId, int depth, std::function<void(Page *, int)>);
   void addCommitHandle(std::function<void()> fn) {
     commitHandlers_.push_back(fn);
@@ -66,7 +67,7 @@ private:
   bool managed_;
   DB *db_;
   meta *metaData_;
-  Bucket rootBucket_;                               // meta表中的根bucket
+  shared_ptr<Bucket> rootBucket_;                   // meta表中的根bucket
   std::unordered_map<pgid, Page *> dirtyPageTable_; // 只有写事务需要
   std::vector<std::function<void()> > commitHandlers_;
   TxStat stats_;

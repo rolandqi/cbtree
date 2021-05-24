@@ -13,6 +13,7 @@
     - [一致性（Consistency）](#一致性consistency)
     - [隔离型（Isolation）](#隔离型isolation)
     - [持久性（Durability）](#持久性durability)
+  - [难点](#难点)
 
 ---
 
@@ -158,3 +159,9 @@ Bolt中的事务类Tx代表具体的事务。
 ### 隔离型（Isolation）
 
 ### 持久性（Durability）
+
+## 难点
+
+1. 第一次手动实现数据库，操作数据节点的操作十分容易出错（递归查找）
+2. 数据的分布关系经常容易记混
+3. debug排查问题比一般的业务代码复杂繁琐，特别是指针指来指去容易出问题

@@ -23,6 +23,8 @@ size_t ElementRef::count() const {
 }
 
 void Cursor::search(const Item &key, pgid pgid) {
+  // 都是从0开始搜索的
+  // LOG(INFO) << "cursor searching pageid: " << pgid;
   NodePtr node = nullptr;
   Page *page = nullptr;
   bucket_->getPageNode(pgid, node, page);
@@ -88,7 +90,7 @@ void Cursor::searchBranchPage(const Item &key, Page *page) {
   search(key, branchElements[index].pageId);
 }
 
-void Cursor::do_seek(Item searchKey, Item &key, Item &value, uint32_t &flag) {
+void *Cursor::do_seek(Item searchKey, Item &key, Item &value, uint32_t &flag) {
   clearElements();
   search(searchKey, bucket_->getRootPage());
 
@@ -97,28 +99,20 @@ void Cursor::do_seek(Item searchKey, Item &key, Item &value, uint32_t &flag) {
     key.reset();
     value.reset();
     flag = 0;
-    return;
+    return nullptr;
   }
-  keyValue(key, value, flag);
+  return keyValue(key, value, flag);
 }
 
-void Cursor::seek(const Item &searchKey, Item &key, Item &value,
-                  uint32_t &flag) {
+void *Cursor::seek(const Item &searchKey, Item &key, Item &value,
+                   uint32_t &flag) {
   key.reset();
   value.reset();
   flag = 0;
-  do_seek(searchKey, key, value, flag);
-  // auto &ref = elements_.top();
-  // if (ref.index_ >= ref.count()) {
-  //   flag = 0;
-  //   key.reset();
-  //   value.reset();
-  //   return;
-  // }
-  // keyValue(key, value, flag);
+  return do_seek(searchKey, key, value, flag);
 }
 
-//  returns the node that the cursor is currently positioned on.
+//  returns the leaf node that the cursor is currently positioned on.
 NodePtr Cursor::getNode() {
   if (!elements_.empty() && elements_.top().node_ && elements_.top().isLeaf()) {
     return elements_.top().node_;
@@ -146,23 +140,26 @@ NodePtr Cursor::getNode() {
     node = node->childAt(v[i].index_);
   }
 
+  if (!node->isLeafNode()) {
+    LOG(ERROR) << "got invalid branch node!"; // expect leaf
+  }
   assert(node->isLeafNode());
   return node;
 }
 
 // 从seek stack的最上层读出k-v
-void Cursor::keyValue(Item &key, Item &value, uint32_t &flag) {
+void *Cursor::keyValue(Item &key, Item &value, uint32_t &flag) {
   if (elements_.empty()) {
     key.reset();
     value.reset();
     flag = 0;
-    return;
+    return nullptr;
   }
 
   auto ref = elements_.top();
   if (ref.count() == 0 || ref.index_ >= ref.count()) {
     LOG(ERROR) << "get Key/value from empty bucket_ / index out of range";
-    return;
+    return nullptr;
   }
 
   // are those values sitting a node?
@@ -171,7 +168,7 @@ void Cursor::keyValue(Item &key, Item &value, uint32_t &flag) {
     key = inode.key;
     value = inode.value;
     flag = inode.flag;
-    return;
+    return nullptr;
   }
 
   // let's get them from page
@@ -179,7 +176,7 @@ void Cursor::keyValue(Item &key, Item &value, uint32_t &flag) {
   key = ret->key();
   value = ret->value();
   flag = ret->flag;
-  return;
+  return ref.page_->getLeafPageKeyElementPtr(ref.index_);
 }
 
 uint32_t Cursor::binarySearchLeaf(leafPageElement *arr, const Item &key,
@@ -196,7 +193,7 @@ uint32_t Cursor::binarySearchLeaf(leafPageElement *arr, const Item &key,
       found = true;
       return mid;
     } else {
-      begin = mid;
+      begin = mid + 1;
     }
   }
   // 如果没找到，返回ceiling
@@ -212,13 +209,13 @@ uint32_t Cursor::binarySearchBranch(branchPageElement *arr, const Item &key,
   uint32_t mid = (begin + end) / 2;
   while (begin < end) {
     mid = (begin + end) / 2;
-    if (arr[mid].key() > key) {
+    if (arr[mid].key().data_ > key.data_) {
       end = mid;
-    } else if (arr[mid].key() == key) {
+    } else if (arr[mid].key().data_ == key.data_) {
       found = true;
       return mid;
     } else {
-      begin = mid;
+      begin = mid + 1;
     }
   }
   // 如果没找到，返回ceiling

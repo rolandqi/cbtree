@@ -18,8 +18,8 @@ implement several b-tree structures in c++.
 - [x] node management
 - [x] transaction
 - [x] bucket(B+Tree) management
-- [ ] unit test
-- [ ] performance test
+- [x] unit test
+- [x] [performance test](doc/bolt_performance_report.md)
 
 ### TODO
 

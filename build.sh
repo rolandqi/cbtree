@@ -20,5 +20,7 @@ fi
 
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug # -DCOVERALLS=ON -DBUILD_ARCH=${march}
+# -DCMAKE_BUILD_TYPE=RelWithDebInfo
 make -j4
-make bolt_test
+make bolt_test -j4
+make bolt_performance_test -j4

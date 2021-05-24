@@ -133,7 +133,8 @@ pgid freeList::allocate(uint32_t numPages) {
   for (uint64_t i = 0; i < ids_.size(); i++) {
     pgid id = ids_[i];
 
-    if (id <= 2) {
+    if (id < 2) {
+      LOG(FATAL) << "Id = " << id;
       assert(false);
     }
 

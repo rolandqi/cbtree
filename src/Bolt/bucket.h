@@ -32,7 +32,7 @@ public:
   NodePtr getCachedNode(pgid pgid);
   void eraseCachedNode(pgid pgid) { nodes_.erase(pgid); }
   void dereference();
-  Bucket *openBucket(Item value);
+  Bucket *openBucket(Item value, void *ptr = nullptr);
   Bucket *newBucket(TxPtr tx);
   Bucket *createBucket(const Item &key);
   Bucket *createBucketIfNotExists(const Item &key);
@@ -56,6 +56,9 @@ public:
   uint32_t getTotalPageNumber();
   void getPageNode(pgid pageId, NodePtr &node, Page *&page);
   bool isWritable() const;
+  int put(const Item &key, const Item &value);
+  int remove(const Item &key);
+  Item get(const Item &key);
 
 private:
   bucketHeader bucketHeader_;

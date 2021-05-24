@@ -48,13 +48,13 @@ uint32_t Node::binarySearch(const InodeList &arr, const Item &key,
   uint32_t mid = (begin + end) / 2;
   while (begin < end) {
     mid = (begin + end) / 2;
-    if (arr[mid].key > key) {
+    if (arr[mid].key.data_ > key.data_) {
       end = mid;
-    } else if (arr[mid].key == key) {
+    } else if (arr[mid].key.data_ == key.data_) {
       found = true;
       return mid;
     } else {
-      begin = mid;
+      begin = mid + 1;
     }
   }
   // 如果没找到，返回ceiling
@@ -174,7 +174,7 @@ void Node::read(Page *page) {
     LOG(FATAL) << "node read receive nullptr.";
   }
   this->pageId_ = page->id;
-  this->isLeaf_ = (page->flag == pageFlags::leafPageFlag);
+  this->isLeaf_ = (page->flag & pageFlags::leafPageFlag) != 0;
   this->inodeList_.resize(page->count);
 
   for (uint16_t i = 0; i < page->count; i++) {
@@ -589,6 +589,11 @@ bool Node::isinlineable(uint32_t maxInlineBucketSize) const {
 }
 
 uint32_t Node::search(const Item &key, bool &found) {
+  // static int enterCnt = 0;
+  // ++enterCnt;
+  // LOG(INFO) << "node search: " << reinterpret_cast<uint64_t>(this) << " size:
+  // "  << inodeList_.size() << " key: " << key.data_ << " enter count: " <<
+  // enterCnt;
   return binarySearch(inodeList_, key, found);
 }
 
@@ -598,6 +603,7 @@ void Node::do_remove(const Item &key) {
   if (!found) {
     return;
   }
+  // index--;
 
   auto b = inodeList_.begin();
   std::advance(b, index);

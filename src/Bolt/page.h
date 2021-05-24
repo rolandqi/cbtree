@@ -14,12 +14,16 @@ struct Page { // 每个page的头
   char ptr[0];
   meta *metaPtr() { return reinterpret_cast<meta *>(ptr); }
   leafPageElement *getLeafPageElement(uint64_t index) {
-    auto *list = reinterpret_cast<leafPageElement *>(&ptr);
+    auto list = reinterpret_cast<leafPageElement *>(&ptr);
     return static_cast<leafPageElement *>(&list[index]);
+  }
+  void *getLeafPageKeyElementPtr(uint64_t index) {
+    auto list = reinterpret_cast<leafPageElement *>(&ptr);
+    return static_cast<void *>(&list[index]);
   }
 
   branchPageElement *getBranchPageElement(uint64_t index) {
-    auto *list = reinterpret_cast<branchPageElement *>(&ptr);
+    auto list = reinterpret_cast<branchPageElement *>(&ptr);
     return static_cast<branchPageElement *>(&list[index]);
   }
 } __attribute__((packed));

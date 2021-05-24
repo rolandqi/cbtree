@@ -37,7 +37,7 @@ bool meta::validate() {
 
 DB::DB(const string &path)
     : StrictMode_(false), NoSync_(false), NoGrowSync_(false), path_(path),
-      lock_file_(path_ + "_lock"), dataref_(nullptr), data_(nullptr),
+      file_(0), lock_file_(path_ + "_lock"), dataref_(nullptr), data_(nullptr),
       freeList_(new freeList()), bucketPool_(MAXOBJPOOLSIZE),
       cursorPool_(MAXOBJPOOLSIZE), nodePool_(MAXOBJPOOLSIZE), batchMu_(),
       rwLock_(), metaLock_(), mmapLock_(), statLock_(), readOnly_(false) {
@@ -144,7 +144,7 @@ int DB::initMeta(uint32_t InitialMMapSize) {
 
   // Dereference all mmap references before unmapping.
   if (rwtx_) {
-    rwtx_->rootBucket_.dereference();
+    rwtx_->rootBucket_->dereference();
   }
   // unmap previous files
   if (!DbMunmap()) {
@@ -302,10 +302,30 @@ Page *DB::allocate(uint32_t numPages, TxPtr tx) {
     ptr->id = pg;
     return ptr;
   }
+  // need to expand mmap file here
   LOG(INFO) << "not free Page, try to mmap new Page!";
-  // ptr->id = rwtx_->metaData->totalPageNumber_;
-  // TODO
-  return nullptr;
+  ptr->id = rwtx_->getMeta()->totalPageNumber_;
+  int minLen = (ptr->id + numPages + 1) * pageSize_;
+  if (minLen > datasz_) {
+    struct stat stat1;
+    {
+      auto ret = fstat(file_, &stat1);
+      if (ret == -1) {
+        LOG(FATAL) << "syscall fstat failed!";
+        delete ptr;
+        return nullptr;
+      }
+    }
+    if (initMeta(minLen)) {
+      LOG(ERROR) << "reallocate file initMeta failed!";
+      delete ptr;
+      return nullptr;
+    }
+  }
+
+  rwtx_->getMeta()->totalPageNumber_ += numPages;
+  LOG(INFO) << "allocate more page successed!";
+  return ptr;
 }
 
 int DB::update(std::function<int(TxPtr tx)> fn) {
@@ -318,6 +338,7 @@ int DB::update(std::function<int(TxPtr tx)> fn) {
   int ret = fn(tx);
   tx->managed_ = false;
   if (ret != 0) {
+    LOG(ERROR) << "user intput returned false!";
     tx->rollback();
     return -1;
   }
@@ -356,7 +377,28 @@ void DB::removeTx(TxPtr tx) {
   LOG(WARNING) << "tx not found!";
 }
 
-int DB::view(std::function<int(TxPtr tx)> fn) { return 0; }
+int DB::view(std::function<int(TxPtr tx)> fn) {
+  auto tx = beginTx();
+  if (tx == nullptr) {
+    return -1;
+  }
+
+  tx->managed_ = true;
+
+  int ret = fn(tx);
+
+  tx->managed_ = false;
+
+  if (ret != 0) {
+    tx->rollback();
+    closeTx(tx);
+    return -1;
+  }
+
+  tx->rollback();
+  closeTx(tx);
+  return 0;
+}
 
 TxPtr DB::beginRWTx() {
   if (readOnly_) {
@@ -374,7 +416,7 @@ TxPtr DB::beginRWTx() {
     rwLock_.unlock();
     return nullptr;
   }
-  rwtx_ = make_shared<Tx>();
+  rwtx_.reset(new Tx());
   rwtx_->setWriteable(true);
   rwtx_->init(this);
 
@@ -392,7 +434,19 @@ TxPtr DB::beginRWTx() {
   return rwtx_;
 }
 
-TxPtr DB::beginTx() { return nullptr; }
+TxPtr DB::beginTx() {
+  std::lock_guard<std::mutex> guard(metaLock_);
+  getMmapRLock();
+  if (!opened_) {
+    unlockMmapLock();
+    return nullptr;
+  }
+
+  txs_.emplace_back(new Tx());
+  auto &tx = txs_.back();
+  tx->init(this);
+  return tx;
+}
 
 bool DB::getMmapRLock() { return pthread_rwlock_rdlock(&mmapLock_) == 0; }
 

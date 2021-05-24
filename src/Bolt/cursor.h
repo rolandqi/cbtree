@@ -31,17 +31,17 @@ public:
   void searchLeaf(const Item &key);
   void searchBranchNode(const Item &key, NodePtr node);
   void searchBranchPage(const Item &key, Page *page);
-  void keyValue(Item &key, Item &value, uint32_t &flag);
+  void *keyValue(Item &key, Item &value, uint32_t &flag);
   void clearElements();
   // weird function signature
   // return kv of the search Key if searchkey exists
   // or return the next Key
-  void do_seek(Item searchKey, Item &key, Item &value, uint32_t &flag);
+  void *do_seek(Item searchKey, Item &key, Item &value, uint32_t &flag);
   // Seek moves the cursor to a given key and returns it.
   // If the key does not exist then the next key is used. If no keys
   // follow, a nil key is returned.
   // The returned key and value are only valid for the life of the transaction.
-  void seek(const Item &searchKey, Item &key, Item &value, uint32_t &flag);
+  void *seek(const Item &searchKey, Item &key, Item &value, uint32_t &flag);
 
   // return the node the cursor is currently on
   NodePtr getNode();

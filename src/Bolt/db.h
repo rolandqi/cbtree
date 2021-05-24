@@ -55,7 +55,7 @@ public:
       char *buf, size_t len, off_t offset) {
     auto ret = ::pwrite(file_, buf, len, offset);
     if (ret == -1) {
-      LOG(INFO) << "pwrite";
+      LOG(ERROR) << "pwrite failed!";
     }
     return ret;
   };

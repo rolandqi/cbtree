@@ -47,7 +47,7 @@ void Bucket::dereference() {
 }
 
 // Item中存放的是bucketHeader
-Bucket *Bucket::openBucket(Item value) {
+Bucket *Bucket::openBucket(Item value, void *ptr) {
   auto child = newBucket(tx_);
 
   // TODO(roland):memory management
@@ -64,7 +64,21 @@ Bucket *Bucket::openBucket(Item value) {
   // bucketHeader *tmp = reinterpret_cast<bucketHeader*>(value.c_str());
   // is this a inline bucket?
   if (child->bucketHeader_.root == 0) {
-    child->page_ = reinterpret_cast<Page *>(&(value.c_str())[BUCKETHEADERSIZE]);
+    LOG(INFO) << "this is a inline bucket.";
+    if (ptr) {
+      child->page_ = reinterpret_cast<Page *>(
+          &(((leafPageElement *)ptr)->valuePtr())[BUCKETHEADERSIZE]);
+      // 指针乱指的下场
+      // LOG(INFO) << "using page bucket address: " <<
+      // (&((leafPageElement*)ptr)->valuePtr())[BUCKETHEADERSIZE];
+      // LOG(INFO) << "using page bucket address: " <<
+      // (&((leafPageElement*)ptr)->valuePtr());
+      // LOG(INFO) << "using page bucket address: " <<
+      // (&((leafPageElement*)ptr));
+    } else {
+      child->page_ =
+          reinterpret_cast<Page *>(&(value.c_str())[BUCKETHEADERSIZE]);
+    }
   }
   return child;
 }
@@ -84,21 +98,22 @@ Bucket *Bucket::getBucketByName(const Item &searchKey) {
   Item key;
   Item value;
   uint32_t flag = 0;
-  cursor->seek(searchKey, key, value, flag);
+  void *ptr = cursor->seek(searchKey, key, value, flag);
   if (searchKey.data_ != key.data_ || !(flag & bucketLeafFlag)) {
     LOG(ERROR) << "getBucketByName failed! no bucket exist.";
     return nullptr;
   }
 
-  auto result = openBucket(value);
+  auto result = openBucket(value, ptr);
   buckets_[searchKey] = result;
+  LOG(INFO) << "get bucket " << searchKey.data_ << " success!";
   return result;
 }
 
 Cursor *Bucket::createCursor() {
   tx_->increaseCurserCount();
   auto ret = new Cursor(this);
-  LOG(INFO) << "create new cursor: " << ret;
+  // LOG(INFO) << "create new cursor: " << ret;
   return ret;
 }
 
@@ -138,6 +153,7 @@ Bucket *Bucket::createBucket(const Item &key) {
   // to be treated as a regular, non-inline bucket for the rest of the tx.
   page_ = nullptr;
   // 通过getBucketByName函数将刚创建的bucket放到buckets_里面去
+  LOG(INFO) << "creat bucket " << key.data_ << " success!";
   return getBucketByName(key);
 }
 
@@ -279,8 +295,9 @@ bool Bucket::spill() {
       child->free();
       newValue = child->write();
     } else {
-      if (child->spill()) {
-        return -1;
+      if (!child->spill()) {
+        LOG(ERROR) << "child bucket spill failed!";
+        return false;
       }
 
       newValue = Item(reinterpret_cast<char *>(&child->bucketHeader_),
@@ -310,11 +327,12 @@ bool Bucket::spill() {
   }
 
   if (rootNode_ == nullptr) {
-    return 0;
+    return true;
   }
 
   auto ret = rootNode_->spill();
   if (ret) {
+    LOG(ERROR) << "node spill failed!";
     return ret;
   }
 
@@ -325,7 +343,7 @@ bool Bucket::spill() {
   }
 
   bucketHeader_.root = rootNode_->getPageId();
-  return 0;
+  return true;
 }
 
 int Bucket::for_each(std::function<int(const Item &, const Item &)> fn) {
@@ -415,3 +433,60 @@ void Bucket::getPageNode(pgid pageId, NodePtr &node, Page *&page) {
 }
 
 bool Bucket::isWritable() const { return tx_->isWritable(); }
+
+int Bucket::put(const Item &key, const Item &value) {
+  if (tx_->db_ == nullptr || !isWritable() || key.length_ == 0 ||
+      key.length_ > MAXKEYSIZE || value.length_ > MAXVALUESIZE) {
+    LOG(INFO) << "invalid parameter!";
+    return -1;
+  }
+
+  auto c = createCursor();
+  Item k;
+  Item v;
+  uint32_t flag = 0;
+
+  c->seek(key, k, v, flag);
+
+  if (k == key && (flag & bucketLeafFlag)) {
+    LOG(FATAL) << "impossible!";
+    return -1;
+  }
+
+  c->getNode()->put(key, key, value, 0, 0);
+  return 0;
+}
+
+int Bucket::remove(const Item &key) {
+  if (tx_->db_ == nullptr || !isWritable() || key.length_ == 0) {
+    LOG(INFO) << "invalid parameter!";
+    return -1;
+  }
+
+  auto c = createCursor();
+  Item k;
+  Item v;
+  uint32_t flag = 0;
+
+  c->seek(key, k, v, flag);
+
+  if (flag & bucketLeafFlag) {
+    LOG(FATAL) << "impossible!";
+    return -1;
+  }
+
+  c->getNode()->del(key);
+  return 0;
+}
+
+Item Bucket::get(const Item &key) {
+  Item k;
+  Item v;
+  uint32_t flag = 0;
+  createCursor()->seek(key, k, v, flag);
+  if ((flag & bucketLeafFlag) || k != key) {
+    LOG(ERROR) << "key not found!";
+    return Item();
+  }
+  return v;
+}

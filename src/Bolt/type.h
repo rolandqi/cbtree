@@ -38,10 +38,10 @@ const int bucketLeafFlag = 0x01; // 该leaf中存储的的是其他bucket结构
 
 struct Item {
   Item() : data_(), length_(0) {}
-  Item(string str) {
-    data_ = str;
-    length_ = str.size();
-  }
+  // Item(string str) {
+  //   data_ = str;
+  //   length_ = str.size();
+  // }
   Item(const string &str) {
     data_ = str;
     length_ = str.size();
@@ -104,6 +104,7 @@ struct leafPageElement {
     return read(pos, ksize);
   } // 从当前位置算偏移，得到key和value值
   Item value() const { return read(pos + ksize, vsize); }
+  char *valuePtr() { return &(reinterpret_cast<char *>(this))[pos + ksize]; }
 } __attribute__((packed));
 
 struct branchPageElement {
