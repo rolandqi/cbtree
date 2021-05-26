@@ -33,6 +33,7 @@ public:
   Tx();
   ~Tx() {}
   Tx(const Tx &) = delete;
+  Tx &operator=(const Tx &) = delete;
   bool isWritable() const { return writable_; }
   void setWriteable(bool writeable) { writable_ = writeable; }
   void increaseCurserCount() { stats_.cursorCount++; }

@@ -37,6 +37,8 @@ class Node : public std::enable_shared_from_this<Node> {
 
 public:
   explicit Node(Bucket *b, NodePtr parentNode);
+  Node(const Node &) = delete;
+  Node &operator=(const Node &) = delete;
   /**
    * setter
    */

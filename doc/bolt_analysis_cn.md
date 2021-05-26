@@ -73,7 +73,7 @@ bucket是一些列的键值对的集合。一个bucket相当于一个命名空�
 
 Bucket类比于mysql中的table，在boltdb中，**meta页面中有一个成员bucket，其存储了整个数据库根bucket的信息**，**而一个数据库中存储的其他table的信息，则作为子bucket存储到Bucket中**。其关系如下：
 
-```c++
+```go
 type DB struct {
   // ...
 	meta0    *meta
@@ -100,22 +100,26 @@ type bucket struct {
 
 子bucket保存在`leafPageElement`中，通过其中的元素flag来标识其是否是一个bucket
 
-```c++
-struct leafPageElement {
-  uint32_t flag = 0; // is this element a bucket? yes:1 (bucketLeafFlag) no:0 (存储B+树叶子页面的内容)
-  uint32_t pos = 0;
-  uint32_t ksize = 0;
-  uint32_t vsize = 0;
-  Item read(uint32_t p, uint32_t s) const {
-    const auto *ptr = reinterpret_cast<const char *>(this);
-    //    return std::string(&ptr[p], &ptr[p + s]);
-    return { &ptr[p], s };
-  }
-  Item key() const {
-    return read(pos, ksize);
-  } // 从当前位置算偏移，得到key和value值
-  Item value() const { return read(pos + ksize, vsize); }
-} __attribute__((packed));
+```go
+// leafPageElement represents a node on a leaf page.
+type leafPageElement struct {
+	flags uint32
+	pos   uint32
+	ksize uint32
+	vsize uint32
+}
+
+// key returns a byte slice of the node key.
+func (n *leafPageElement) key() []byte {
+	buf := (*[maxAllocSize]byte)(unsafe.Pointer(n))
+	return (*[maxAllocSize]byte)(unsafe.Pointer(&buf[n.pos]))[:n.ksize:n.ksize]
+}
+
+// value returns a byte slice of the node value.
+func (n *leafPageElement) value() []byte {
+	buf := (*[maxAllocSize]byte)(unsafe.Pointer(n))
+	return (*[maxAllocSize]byte)(unsafe.Pointer(&buf[n.pos+n.ksize]))[:n.vsize:n.vsize]
+}
 ```
 
 Bucket会有一个当前关联的事务`Tx`

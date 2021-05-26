@@ -47,6 +47,8 @@ class DB {
 public:
   DB(const string &path);
   ~DB();
+  DB(const DB &) = delete;
+  DB &operator=(const DB &) = delete;
   int Open(const Options &options);
   int Init();
   void DbClose();
