@@ -23,7 +23,7 @@ void test_8byte_random_insertion(std::shared_ptr<DB> db) {
     uint64_t intervals = 0, begin, end;
     int ret;
     auto b = tx->getBucket(bucketname);
-    for (int i = 0; i < max_recursion; ++i) {
+    for (uint64_t i = 0; i < max_recursion; ++i) {
       std::ostringstream ss;
       ss << std::setw(8) << std::setfill('0') << (rand() % max_recursion);
       std::string str = ss.str();
@@ -67,7 +67,7 @@ void test_8byte_random_transaction(std::shared_ptr<DB> db) {
     return 0;
   };
 
-  for (int i = 0; i < max_recursion; ++i) {
+  for (uint64_t i = 0; i < max_recursion; ++i) {
     std::ostringstream ss;
     ss << std::setw(8) << std::setfill('0') << (rand() % max_recursion);
     Item str = Item(ss.str());
@@ -92,7 +92,7 @@ void test_8byte_seq_insertion(std::shared_ptr<DB> db) {
     uint64_t intervals = 0, begin, end;
     int ret;
     auto b = tx->getBucket(bucketname);
-    for (int i = 0; i < max_recursion; ++i) {
+    for (uint64_t i = 0; i < max_recursion; ++i) {
       std::ostringstream ss;
       ss << std::setw(8) << std::setfill('0') << i;
       std::string str = ss.str();
@@ -136,7 +136,7 @@ void test_8byte_seq_transaction(std::shared_ptr<DB> db) {
     return 0;
   };
 
-  for (int i = 0; i < max_recursion; ++i) {
+  for (uint64_t i = 0; i < max_recursion; ++i) {
     std::ostringstream ss;
     ss << std::setw(8) << std::setfill('0') << i;
     Item str = Item(ss.str());
@@ -159,7 +159,6 @@ void test_8byte_seq_transaction(std::shared_ptr<DB> db) {
 
 void test_8byte_query_transaction(std::shared_ptr<DB> db) {
   uint64_t intervals = 0, begin, end;
-  int ret;
 
   auto func = [](const Item & str, TxPtr tx)->int {
     auto b = tx->getBucket(bucketname);
@@ -172,8 +171,8 @@ void test_8byte_query_transaction(std::shared_ptr<DB> db) {
     }
     return 0;
   };
-
-  for (int i = 0; i < max_recursion; ++i) {
+  int ret = 0;
+  for (uint64_t i = 0; i < max_recursion; ++i) {
     std::ostringstream ss;
     ss << std::setw(8) << std::setfill('0') << i;
     Item str = Item(ss.str());
@@ -181,9 +180,9 @@ void test_8byte_query_transaction(std::shared_ptr<DB> db) {
     begin = usec_now();
 
     ret = db->view(func_1);
-    // if (ret != 0) {
-    //   LOG(FATAL) << "test_8byte_query_transaction failed!";
-    // }
+    if (ret != 0) {
+      LOG(FATAL) << "test_8byte_query_transaction failed!";
+    }
 
     end = usec_now();
     intervals += end - begin;

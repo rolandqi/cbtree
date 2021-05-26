@@ -248,7 +248,7 @@ TEST(dbtest, update_query_entry_test) {
     auto item1 = b->get(key1);
     EXPECT_EQ(item1, key1);
     auto item2 = b->get(key2);
-    EXPECT_EQ(item2.length_, 0);
+    EXPECT_EQ(item2.length_, uint32_t(0));
     return 0;
   };
   ret = db->view(viewFunc);

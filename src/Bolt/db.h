@@ -54,7 +54,7 @@ public:
   void DbClose();
   Page *pageInBuffer(char *ptr, size_t length, pgid pageId);
   const std::function<ssize_t(char *, size_t, off_t)> writeAt = [this](
-      char *buf, size_t len, off_t offset) {
+      char *buf, size_t len, off_t offset) -> ssize_t {
     auto ret = ::pwrite(file_, buf, len, offset);
     if (ret == -1) {
       LOG(ERROR) << "pwrite failed!";

@@ -173,7 +173,7 @@ int Tx::writeMeta() {
   Page *page = reinterpret_cast<Page *>(tmp.data());
   metaData_->write(page);
 
-  if (db_->writeAt(tmp.data(), tmp.size(), page->id * 4096) != tmp.size()) {
+  if (db_->writeAt(tmp.data(), tmp.size(), page->id * 4096) != (int)tmp.size()) {
     LOG(ERROR) << "writeAt meta failed!";
     return -1;
   }
